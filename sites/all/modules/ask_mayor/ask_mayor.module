@@ -1,0 +1,273 @@
+<?php
+module_load_include('inc', 'ask_mayor', 'src/ask_mayor.sql');
+/**
+ * Defines permissions for ask mayor module.
+ * Implements hook_permission().
+ */
+function ask_mayor_permission() {
+  $permissions = [
+    'access ask_mayor_messages content' => [
+      'title' => t('Access manage messages'),
+      'description' => t('Perform updating and replying on Ask Mayor Module.'),
+      'restrict access' => TRUE,
+    ],
+    'access ask_mayor_configuration pages' => [
+      'title' => t('Access manage configuration'),
+      'description' => t('Perform administration tasks for Ask Mayor Module.'),
+      'restrict access' => TRUE,
+    ]
+  ];
+  return $permissions;
+}
+
+/**
+ *  Adds the paths to pages for the ask mayor module.
+ * Implements hook_menu().
+ */
+function ask_mayor_menu() {
+  //main page config
+  $items['admin/config/content/ask-the-mayor'] = [
+    'title' => t('Ask the Mayor'),
+    'position' => 'left',
+    'file' => 'src/forms/admin_main_page.inc',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => ['_admin_main_page'],
+    'access arguments' => ['access ask_mayor_configuration pages']
+  ];
+  // the default config for main page settings tab
+  $items['admin/config/content/ask-the-mayor/main-page'] = [
+    'title' => t("Ask The Mayor Page Settings"),
+    'access arguments' => ['access ask_mayor_configuration pages'],
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  ];
+  // The module configuration tab
+  $items['admin/config/content/ask-the-mayor/admin-settings'] = [
+    'title' => t('Admin Settings'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -9,
+    'position' => 'left',
+    'file' => 'src/forms/admin_settings.inc',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => ['_admin_settings'],
+    'access arguments' => ['access ask_mayor_configuration pages']
+  ];
+  // Public page for the module
+  $items[variable_get('ask_mayor_main_page_path', 'ask-the-mayor')] = [
+    'title' => variable_get('ask_mayor_main_page_title', t('Ask the Mayor')),
+    'page callback' => '_ask_mayor_page_callback',
+    'access arguments' => ['access content'],
+    'file' => 'src/pages/ask_mayor_page.inc',
+    'file path' => drupal_get_path('module', 'ask_mayor'),
+  ];
+  // Management overview page of questions
+  $items['admin/ask-the-mayor'] = [
+    'title' => t('Ask the Mayor'),
+    'description' => t('Manage your messages.'),
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => ['access ask_mayor_messages content'],
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  ];
+  // Needs response overview page
+  $items['admin/ask-the-mayor/needs-response'] = [
+    'title' => t('Needs Response'),
+    'description' => t('Manage your messages.'),
+    'page callback' => '_ask_mayor_needs_response',
+    'access arguments' => ['access ask_mayor_messages content'],
+    'file' => 'src/forms/ask_mayor_needs_response.inc',
+    'file path' => drupal_get_path('module', 'ask_mayor'),
+    'type' => MENU_NORMAL_ITEM,
+  ];
+  // Management of the questions
+  $items['admin/ask-the-mayor/manage'] = [
+    'title' => t('Manage entries'),
+    'description' => t('Manage all responses and questions'),
+    'page callback' => '_ask_mayor_manage_entries',
+    'access arguments' => ['access ask_mayor_messages content'],
+    'file' => 'src/forms/ask_mayor_manage_entries.inc',
+    'file path' => drupal_get_path('module', 'ask_mayor'),
+    'type' => MENU_NORMAL_ITEM,
+  ];
+  // Delete task for removing a question from the system.
+  $items['admin/ask-the-mayor/manage/%/delete'] = [
+    'page callback' => '_ask_mayor_manage_delete',
+    'page arguments' => [3],
+    'access arguments' => ['access ask_mayor_messages content'],
+    'file' => 'src/forms/ask_mayor_manage_delete.inc',
+    'file path' => drupal_get_path('module', 'ask_mayor'),
+  ];
+  // Respond to message form.
+  $items['admin/ask-the-mayor/manage/%/respond'] = [
+    'title' => t('Respond to Message'),
+    'page callback' => '_ask_mayor_respond',
+    'page arguments' => [3],
+    'access arguments' => ['access ask_mayor_messages content'],
+    'file' => 'src/forms/ask_mayor_respond.inc',
+    'file path' => drupal_get_path('module', 'ask_mayor'),
+  ];
+  // Public page to view a question and response.
+  $items['ask-the-mayor/view-question/%'] = [
+    'page callback' => '_ask_mayor_view_question',
+    'page arguments' => [2],
+    'access arguments' => ['access content'],
+    'file' => 'src/pages/ask_mayor_view_question.inc',
+    'file path' => drupal_get_path('module', 'ask_mayor'),
+  ];
+
+  $items['ask-the-mayor/archive/%'] = [
+    'page callback' => '_ask_mayor_archive_question',
+    'page arguments' => [2],
+    'access arguments' => ['access content'],
+    'file' => 'src/pages/ask_mayor_archive_question.inc',
+    'file path' => drupal_get_path('module', 'ask_mayor'),
+  ];
+
+  return $items;
+}
+
+/**
+ *  This links custom templates to public pages.
+ * Implements hook_theme() to add the template definition.
+ **/
+function ask_mayor_theme($existing, $type, $theme, $path) {
+  $theme = [];
+  // Public page template for question and response view
+  $theme['ask_mayor_view_page'] = array(
+    'template' => 'templates/ask-mayor-view-page',
+    'variables' => [],
+  );
+  // Public page for the question form and teaser block
+  $theme['ask_mayor_page'] = [
+    'template' => 'templates/ask-mayor-page',
+    'variables' => [],
+  ];
+
+  $theme['ask_mayor_archive'] = [
+    'template' => 'templates/ask-mayor-archive',
+    'variables' => [],
+  ];
+
+  return $theme;
+}
+
+/**
+ * Create a custom teaser response block to view teasers of the questions that have a response
+ * Implements hook_block_info().
+ */
+function ask_mayor_block_info() {
+  $blocks['response_teaser'] = [
+    'info' => t("Ask the Mayor Teaser Responses")
+  ];
+
+  $blocks['ask_mayor_archive'] = [
+    'info' => t('Ask the Mayor Archive Block')
+  ];
+
+  return $blocks;
+}
+
+/**
+ *
+ * Implements hook_block_view().
+ */
+function ask_mayor_block_view($delta = '') {
+  $block = [];
+  switch ($delta) {
+    case 'response_teaser': $block = _ask_mayor_response_teaser();
+    break;
+    case 'ask_mayor_archive': $block = _ask_mayor_archive_block();
+  }
+
+  return $block;
+}
+
+/**
+ * the content for the custom teaser block.
+ * @return array
+ */
+function _ask_mayor_response_teaser() {
+  $block = [];
+  $content = '';
+  // Set teaser pager amount
+  $results = ask_mayor_load_all_question(variable_get('ask_mayor_pager_block', 5));
+  // build rows
+  if($results) {
+    $content = '<div class="response_teaser">';
+    foreach ($results as $result) {
+      $teaser = '<div class="item">';
+      $teaser .= "<h3>$result->subject</h3>";
+      $teaser .= '<span class="date">' . format_date($result->created, 'custom', 'd F Y') . '</span>';
+      $teaser .= '<p>' . substr($result->question, 0, 250) . '</p>';
+      $teaser .= '</div>';
+      $content .= l($teaser, 'ask-the-mayor/view-question/' . $result->qid, ['query' => drupal_get_destination(),'html' => TRUE]);
+    }
+    $content .= '</div>';
+  }
+
+  // Add the theme of pager to the block.
+  $block['content'] = $content. theme('pager');
+  return $block;
+}
+
+/**
+ * @return array
+ */
+function _ask_mayor_archive_block() {
+  $block = [];
+  $content = '';
+
+  $years = ask_mayor_get_distinct_years();
+  if ($years) {
+    $content = '<div class="archive_block">';
+    $content .= '<h2>Archive</h2>';
+    foreach ($years as $year) {
+      $count = ask_mayor_count_year($year->year);
+      $content .= l($year->year . " ($count)", 'ask-the-mayor/archive/' . $year->year, ['query' => drupal_get_destination() ,'html' => TRUE]);
+    }
+    $content .= '</div>';
+  }
+
+  $block['content'] = $content;
+  return $block;
+}
+/*
+ * Mail handlers for submitting question and response
+ * Implements hook_mail()
+ */
+function ask_mayor_mail ($key, &$message, $params) {
+  global $base_url;
+  switch ($key) {
+    case 'question_notice':
+      $question = ask_mayor_load_question($params['qid']);
+      // Set headers etc
+      $message['subject'] = t('Question to the mayor has been submitted');
+      $message['body'][] = t($question['subject']);
+      $message['body'][] = t($question['question']);
+      $message['body'][] = t('Respond to message at, ') . $base_url . "/admin/ask-the-mayor/manage/".$params['qid']."/respond";
+      drupal_set_message('Thank you for submitting your question.');
+      break;
+    case 'question_verification':
+      $question = ask_mayor_load_question($params['qid']);
+      $message['subject'] = t('Your question to the mayor has been submitted');
+      $message['body'][] = t($question['subject']);
+      $message['body'][] = t($question['question']);
+      break;
+    case 'response_notice':
+      $response = ask_mayor_load_question($params['qid']);
+      // Set headers etc
+      $message['subject'] = t('Mayor Has responded to your message.');
+      $message['to'] = $response['mail'];
+      $message['body'][] = t("Hello @name,", ['@name' => $response['submitter_name']]);
+      if (!empty(variable_get('ask_mayor_email_response_body'))) {
+        $body = variable_get('ask_mayor_email_response_body');
+        $message['body'][] = t($body);
+      } else {
+        $message['body'][] = t($response['subject']);
+        $message['body'][] = t($response['question']);
+      }
+      $message['body'][] = t('View the response at, ') . $base_url . "/admin/ask-the-mayor/manage/".$params['qid']."/respond";
+      drupal_set_message('Response has been sent.');
+      break;
+  }
+}

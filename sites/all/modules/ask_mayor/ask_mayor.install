@@ -1,0 +1,75 @@
+<?php
+
+function ask_mayor_schema() {
+  $schema['ask_mayor'] = [
+    'fields' => [
+      'qid' => [
+        'description' => 'Primary Key: Unique Question ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'mail' => [
+        'type' => 'varchar',
+        'length' => 254,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => "User's e-mail address.",
+      ],
+      'submitter_name' => [
+        'type' => 'varchar',
+        'length' => 254,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => "The submitters name.",
+      ],
+      'subject' => [
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+        'description' => "Subject of the question.",
+      ],
+      'question' => [
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+        'description' => "User's questions",
+      ],
+      'response' => [
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => FALSE,
+        'description' => "Admin users response.",
+        'default' => NULL,
+      ],
+      'uid' => [
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'description' => 'Responders unique user ID.',
+        'default' => 0,
+      ],
+      'year' => [
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Year in which was created',
+      ],
+      'created' => [
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Timestamp for when created.',
+      ],
+      'updated' => [
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Timestamp for when last updated.',
+      ]
+    ],
+    'primary key' => ['qid'],
+  ];
+
+  return $schema;
+}

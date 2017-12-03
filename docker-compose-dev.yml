@@ -1,0 +1,10 @@
+version: "2"
+
+services:
+  php:
+    volumes:
+      - askmayor:/var/www/html:nocopy # Replace volume to this to use docker-sync for macOS users
+
+volumes:
+  askmayor:
+    external: true

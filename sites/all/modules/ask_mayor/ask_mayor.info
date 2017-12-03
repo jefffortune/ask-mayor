@@ -1,0 +1,6 @@
+name = Ask the mayor
+description = "Forum for asking the Mayor questions."
+package = forum
+version = VERSION
+core = 7.x
+configure = admin/config/content/ask-the-mayor
